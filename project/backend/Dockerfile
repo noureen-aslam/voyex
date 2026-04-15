@@ -1,14 +1,15 @@
-# Build Stage
-FROM maven:3.8.5-openjdk-17 AS build
-COPY . .
+# 1. Build the Java Backend
+FROM maven:3.9.9-eclipse-temurin-17 AS build
+WORKDIR /app
+# Only copy the backend files (replace 'backend' with your actual folder name if needed)
+COPY . . 
 RUN mvn clean package -DskipTests
 
-# Run Stage
-FROM tomcat:10.1-jdk17-onbuild
-# Remove default Tomcat apps
+# 2. Run in Tomcat
+FROM tomcat:10.1-jdk17-temurin
 RUN rm -rf /usr/local/tomcat/webapps/*
-# Copy your war file as ROOT.war so it serves at /
-COPY --from=build /target/*.war /usr/local/tomcat/webapps/ROOT.war
+# Adjust 'target/*.war' if your war has a specific name
+COPY --from=build /app/target/*.war /usr/local/tomcat/webapps/ROOT.war
 
 EXPOSE 8080
 CMD ["catalina.sh", "run"]
