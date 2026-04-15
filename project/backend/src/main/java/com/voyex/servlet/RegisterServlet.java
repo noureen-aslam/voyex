@@ -15,22 +15,26 @@ public class RegisterServlet extends BaseJsonServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
+            // Read JSON from request body
             Map<String, String> regRequest = GSON.fromJson(request.getReader(), Map.class);
             
             String email = regRequest.get("email");
             String password = regRequest.get("password");
             String fullName = regRequest.get("fullName");
 
+            // Validation
             if (email == null || password == null || fullName == null) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, Map.of("message", "All fields are required."));
                 return;
             }
 
+            // Create User Object
             User newUser = new User();
             newUser.setEmail(email);
-            newUser.setPassword(password); 
+            newUser.setPassword(password); // Matches the 'setPassword' method in User model
             newUser.setFullName(fullName);
 
+            // Execute Database Logic
             boolean success = userDao.registerUser(newUser);
 
             if (success) {
@@ -42,6 +46,7 @@ public class RegisterServlet extends BaseJsonServlet {
                 writeJson(response, HttpServletResponse.SC_CONFLICT, Map.of("message", "Email already exists."));
             }
         } catch (Exception e) {
+            e.printStackTrace(); // Good for debugging Render logs
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, Map.of("message", "Server error."));
         }
     }
