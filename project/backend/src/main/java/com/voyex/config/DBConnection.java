@@ -11,25 +11,23 @@ public final class DBConnection {
     private final String password;
 
     private DBConnection() {
-        // Fix for "No suitable driver found"
+        // 1. Force the driver to load (Fixes the "No suitable driver" error)
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
         } catch (ClassNotFoundException e) {
-            System.err.println("CRITICAL: MySQL Driver not found!");
+            System.err.println("MySQL Driver not found!");
         }
 
-        // Matching your Render keys exactly
-        this.url = readEnv("DB_URL", "jdbc:mysql://root:CxbIrLxJvzPtWpgtulMSBzBzPydphPTA@mysql.railway.internal:3306/railway");
-        this.username = readEnv("DB_USERNAME", "root"); 
+        // 2. Read from your Render Env Variables
+        this.url = readEnv("DB_URL", "jdbc:mysql://localhost:3306/voyex");
+        this.username = readEnv("DB_USERNAME", "root");
         this.password = readEnv("DB_PASSWORD", "");
     }
 
     public static DBConnection getInstance() {
         if (instance == null) {
             synchronized (DBConnection.class) {
-                if (instance == null) {
-                    instance = new DBConnection();
-                }
+                if (instance == null) instance = new DBConnection();
             }
         }
         return instance;
