@@ -35,35 +35,52 @@ interface ApiErrorPayload {
   message?: string;
 }
 
-// Explicitly point to Tomcat if no env variable is found
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+/**
+ * Clean the Base URL: Removes trailing slashes to prevent "//api/..." double-slash errors
+ */
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = BASE_URL.replace(/\/$/, '');
 
+/**
+ * Core fetch wrapper with improved error handling and CORS support
+ */
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: 'include',
+  // Ensure path starts with a slash
+  const urlPath = path.startsWith('/') ? path : `/${path}`;
+  
+  const response = await fetch(`${API_BASE_URL}${urlPath}`, {
+    // If you use HttpSessions in Java, 'include' is required for cookies
+    credentials: 'include', 
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       ...(init?.headers || {}),
     },
     ...init,
   });
 
+  // Handle Non-200 Responses
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
+    
     try {
       const errorBody = (await response.json()) as ApiErrorPayload;
-      if (errorBody.message) {
+      if (errorBody && errorBody.message) {
         message = errorBody.message;
       }
-    } catch {
-      // Use the generic message.
+    } catch (e) {
+      // If response isn't JSON, fallback to generic status message
     }
+    
     throw new Error(message);
   }
 
   return response.json() as Promise<T>;
 }
 
+/**
+ * AUTHENTICATION API
+ */
 export async function login(email: string, password: string): Promise<LoginResponse> {
   return apiFetch<LoginResponse>('/api/auth/login', {
     method: 'POST',
@@ -71,7 +88,6 @@ export async function login(email: string, password: string): Promise<LoginRespo
   });
 }
 
-// NEW: Registration function to enable Sign Up
 export async function register(email: string, password: string, fullName: string): Promise<LoginResponse> {
   return apiFetch<LoginResponse>('/api/auth/register', {
     method: 'POST',
@@ -79,11 +95,17 @@ export async function register(email: string, password: string, fullName: string
   });
 }
 
+/**
+ * PACKAGES API
+ */
 export async function getPackages(): Promise<TravelPackage[]> {
   const response = await apiFetch<{ packages: TravelPackage[] }>('/api/packages');
-  return response.packages;
+  return response.packages || [];
 }
 
+/**
+ * TRIPS & BOOKINGS API
+ */
 export async function createTripBooking(payload: {
   packageId?: number;
   destination: string;
@@ -100,5 +122,5 @@ export async function createTripBooking(payload: {
 
 export async function getMyTrips(): Promise<Trip[]> {
   const response = await apiFetch<{ trips: Trip[] }>('/api/trips');
-  return response.trips;
+  return response.trips || [];
 }
