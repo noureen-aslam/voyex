@@ -11,8 +11,16 @@ public final class DBConnection {
     private final String password;
 
     private DBConnection() {
-        this.url = readEnv("DB_URL", "jdbc:mysql://localhost:3306/voyex?useSSL=false&serverTimezone=UTC");
-        this.username = readEnv("DB_USERNAME", "root");
+        // Fix for "No suitable driver found"
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+        } catch (ClassNotFoundException e) {
+            System.err.println("CRITICAL: MySQL Driver not found!");
+        }
+
+        // Matching your Render keys exactly
+        this.url = readEnv("DB_URL", "jdbc:mysql://root:CxbIrLxJvzPtWpgtulMSBzBzPydphPTA@mysql.railway.internal:3306/railway");
+        this.username = readEnv("DB_USERNAME", "root"); 
         this.password = readEnv("DB_PASSWORD", "");
     }
 
@@ -33,6 +41,6 @@ public final class DBConnection {
 
     private String readEnv(String key, String fallback) {
         String value = System.getenv(key);
-        return value == null || value.isBlank() ? fallback : value;
+        return (value == null || value.isBlank()) ? fallback : value;
     }
 }
