@@ -14,6 +14,7 @@ com\voyex\servlet\TripServlet.class
 com\voyex\model\Trip.class
 com\voyex\filter\CORSFilter.class
 com\voyex\servlet\FrontendServlet.class
+com\voyex\servlet\RegisterServlet.class
 com\voyex\servlet\LoginServlet.class
 com\voyex\dao\TripDao.class
 com\voyex\filter\GzipFilter.class
