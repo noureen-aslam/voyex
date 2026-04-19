@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
-// 1. Define the User interface based on your API response
+// 1. Interfaces
 interface User {
   id: number;
   fullName: string;
@@ -39,13 +39,18 @@ interface TripContextType {
   setCurrentStep: (step: number) => void;
   calculateTotalCost: () => number;
   
-  // Auth State (Added this!)
+  // Auth State
   user: User | null;
   loginUser: (userData: User) => void;
   logout: () => void;
   isAuthenticated: boolean;
+
+  // Payment/Booking Sync
+  activeBookingId: string | null;
+  setActiveBookingId: (id: string | null) => void;
 }
 
+// 2. Initial States
 const initialTripData: TripData = {
   destination: '',
   startDate: '',
@@ -63,24 +68,33 @@ const initialTripData: TripData = {
 
 const TripContext = createContext<TripContextType | undefined>(undefined);
 
+// 3. Provider Component
 export const TripProvider = ({ children }: { children: ReactNode }) => {
+  // --- States ---
   const [tripData, setTripData] = useState<TripData>(initialTripData);
   const [currentStep, setCurrentStep] = useState(1);
+  const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   
-  // Initialize user from localStorage if it exists
   const [user, setUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem('voyexUser');
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
+  // --- Effects ---
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('voyexUser', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('voyexUser');
+    }
+  }, [user]);
+
   // --- Auth Actions ---
   const loginUser = (userData: User) => {
-    localStorage.setItem('voyexUser', JSON.stringify(userData));
     setUser(userData);
   };
 
   const logout = () => {
-    localStorage.removeItem('voyexUser');
     setUser(null);
   };
 
@@ -92,29 +106,36 @@ export const TripProvider = ({ children }: { children: ReactNode }) => {
   const resetTripData = () => {
     setTripData(initialTripData);
     setCurrentStep(1);
+    setActiveBookingId(null);
   };
 
   const calculateTotalCost = () => {
     let total = 0;
+    
+    // 1. Vehicle Cost
     if (tripData.vehicle) {
       total += tripData.vehicle.pricePerKm * tripData.vehicle.distance;
     }
+
+    // 2. Hotels Cost
     tripData.hotels.forEach((hotel) => {
       total += (hotel.pricePerNight || 0) * (hotel.nights || 1);
     });
 
+    // 3. Meals Cost
     const mealCount = Object.values(tripData.meals).filter(Boolean).length;
     const days = tripData.startDate && tripData.endDate ?
       Math.ceil((new Date(tripData.endDate).getTime() - new Date(tripData.startDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
     
-    // Logic: meals * days * travelers * average price (300)
     total += mealCount * (days || 1) * tripData.travelers * 300;
 
+    // 4. Sightseeing Cost
     tripData.sightseeing.forEach((place) => {
       total += (place.price || 0) * tripData.travelers;
     });
 
-    return total;
+    // 5. Default base if nothing selected yet
+    return total > 0 ? total : 5000 + (tripData.travelers * 1200);
   };
 
   return (
@@ -130,6 +151,8 @@ export const TripProvider = ({ children }: { children: ReactNode }) => {
         loginUser,
         logout,
         isAuthenticated: !!user,
+        activeBookingId,
+        setActiveBookingId,
       }}
     >
       {children}
@@ -137,6 +160,7 @@ export const TripProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// 4. Hook
 export const useTripContext = () => {
   const context = useContext(TripContext);
   if (!context) {

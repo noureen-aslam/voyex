@@ -15,26 +15,31 @@ public class RegisterServlet extends BaseJsonServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            // Read JSON from request body
+            // Parse Request Body
             Map<String, String> regRequest = GSON.fromJson(request.getReader(), Map.class);
             
+            if (regRequest == null) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, Map.of("message", "Invalid request body."));
+                return;
+            }
+
             String email = regRequest.get("email");
             String password = regRequest.get("password");
             String fullName = regRequest.get("fullName");
 
             // Validation
-            if (email == null || password == null || fullName == null) {
+            if (email == null || password == null || fullName == null || email.isBlank()) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, Map.of("message", "All fields are required."));
                 return;
             }
 
-            // Create User Object
+            // Map to User Model
             User newUser = new User();
             newUser.setEmail(email);
-            newUser.setPassword(password); // Matches the 'setPassword' method in User model
+            newUser.setPassword(password); 
             newUser.setFullName(fullName);
 
-            // Execute Database Logic
+            // Database Operation
             boolean success = userDao.registerUser(newUser);
 
             if (success) {
@@ -45,9 +50,12 @@ public class RegisterServlet extends BaseJsonServlet {
             } else {
                 writeJson(response, HttpServletResponse.SC_CONFLICT, Map.of("message", "Email already exists."));
             }
+            
         } catch (Exception e) {
-            e.printStackTrace(); // Good for debugging Render logs
-            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, Map.of("message", "Server error."));
+            // Logs to Render's terminal for debugging
+            System.err.println("Registration Error: " + e.getMessage());
+            e.printStackTrace(); 
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, Map.of("message", "Internal Server Error."));
         }
     }
 }

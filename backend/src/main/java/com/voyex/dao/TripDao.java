@@ -45,6 +45,30 @@ public class TripDao {
             }
         }
     }
+    // Add this inside your TripDao.java
+public boolean updateTripStatus(long bookingId, String status) throws SQLException {
+    String sql = "UPDATE trips SET status = ? WHERE id = ?";
+    try (Connection connection = DBConnection.getInstance().getConnection();
+         PreparedStatement stmt = connection.prepareStatement(sql)) {
+        
+        stmt.setString(1, status);
+        stmt.setLong(2, bookingId);
+        
+        return stmt.executeUpdate() > 0;
+    }
+}
+public boolean confirmPayment(long bookingId, String transactionId) throws SQLException {
+    // We update status and store a fake transaction ID for professionalism
+    String sql = "UPDATE trips SET status = 'CONFIRMED', transaction_id = ? WHERE id = ?";
+    try (Connection connection = DBConnection.getInstance().getConnection();
+         PreparedStatement stmt = connection.prepareStatement(sql)) {
+        
+        stmt.setString(1, transactionId);
+        stmt.setLong(2, bookingId);
+        
+        return stmt.executeUpdate() > 0;
+    }
+}
 
     public List<Trip> getTripsByUserId(long userId) throws SQLException {
         List<Trip> trips = new ArrayList<>();
