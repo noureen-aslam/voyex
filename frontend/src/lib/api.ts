@@ -45,10 +45,12 @@ const API_BASE_URL = BASE_URL.replace(/\/$/, '');
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const urlPath = path.startsWith('/') ? path : `/${path}`;
   
-  const response = await fetch(`${API_BASE_URL}${urlPath}`, {
-    credentials: 'include', 
-    headers: {
-      'Content-Type': 'application/json',
+  // Change this in your apiFetch function
+const response = await fetch(`${API_BASE_URL}${urlPath}`, {
+  credentials: 'omit', // Change from 'include' to 'omit'
+  headers: {
+    'Content-Type': 'application/json',
+    // ... existing headers ...
       'Accept': 'application/json',
       ...(init?.headers || {}),
     },

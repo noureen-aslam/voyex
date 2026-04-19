@@ -2,7 +2,7 @@
 FROM maven:3.9.9-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copy only pom.xml first (better caching)
+# Copy only pom.xml first for caching
 COPY backend/pom.xml .
 RUN mvn dependency:go-offline
 
@@ -16,12 +16,12 @@ RUN mvn clean package -DskipTests
 FROM tomcat:10.1-jdk17-temurin
 RUN rm -rf /usr/local/tomcat/webapps/*
 
-# Environment variables for DB (set securely in Render dashboard)
-ENV DB_URL=jdbc:mysql://localhost:3306/voyex?useSSL=false&serverTimezone=UTC
-ENV DB_USERNAME=root
-ENV DB_PASSWORD=
+# These variables will be pulled from Render's dashboard at runtime
+ENV DB_URL=${DB_URL}
+ENV DB_USERNAME=${DB_USERNAME}
+ENV DB_PASSWORD=${DB_PASSWORD}
 
-# Copy the built WAR into Tomcat
+# Copy the built WAR into Tomcat as ROOT.war to serve from the base URL
 COPY --from=build /app/target/*.war /usr/local/tomcat/webapps/ROOT.war
 
 EXPOSE 8080
