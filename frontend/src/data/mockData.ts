@@ -10,7 +10,7 @@ export const destinations = [
   {
     id: 2,
     name: 'Manali',
-    image: 'https://images.pexels.com/photos/1587177/pexels-photo-1587177.jpeg',
+    image: 'https://images.pexels.com/photos/338504/pexels-photo-338504.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
     price: '₹24,999',
     duration: '5N/6D',
     distance: 540,
@@ -72,7 +72,7 @@ export const vehicles = [
     name: 'Sedan',
     capacity: 5,
     pricePerKm: 12,
-    image: 'https://images.pexels.com/photos/116675/pexels-photo-116675.jpeg',
+    image: 'https://images.pexels.com/photos/116675/pexels-photo-116675.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
     features: ['AC', 'Music System', 'Comfortable Seats'],
   },
   {
@@ -81,7 +81,7 @@ export const vehicles = [
     name: 'SUV',
     capacity: 7,
     pricePerKm: 18,
-    image: 'https://images.pexels.com/photos/116675/pexels-photo-116675.jpeg',
+    image: 'https://images.pexels.com/photos/11336600/pexels-photo-11336600.jpeg',
     features: ['AC', 'Music System', 'Extra Luggage Space'],
   },
   {
@@ -90,7 +90,7 @@ export const vehicles = [
     name: 'Tempo Traveller',
     capacity: 12,
     pricePerKm: 22,
-    image: 'https://images.pexels.com/photos/116675/pexels-photo-116675.jpeg',
+    image: 'https://images.pexels.com/photos/30703624/pexels-photo-30703624.jpeg',
     features: ['AC', 'Push Back Seats', 'LED TV'],
   },
   {
@@ -99,7 +99,7 @@ export const vehicles = [
     name: 'Mini Bus',
     capacity: 25,
     pricePerKm: 35,
-    image: 'https://images.pexels.com/photos/116675/pexels-photo-116675.jpeg',
+    image: 'https://images.pexels.com/photos/13315396/pexels-photo-13315396.jpeg',
     features: ['AC', 'Comfortable Seating', 'Entertainment System'],
   },
 ];
@@ -112,7 +112,7 @@ export const hotels = [
     rating: 4.8,
     pricePerNight: 5999,
     type: 'Luxury',
-    image: 'https://images.pexels.com/photos/258154/pexels-photo-258154.jpeg',
+    image: 'https://images.pexels.com/photos/13708500/pexels-photo-13708500.jpeg',
     amenities: ['Pool', 'Spa', 'Beach View', 'Restaurant'],
   },
   {
@@ -122,7 +122,7 @@ export const hotels = [
     rating: 4.5,
     pricePerNight: 3999,
     type: 'Standard',
-    image: 'https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg',
+    image: 'https://images.pexels.com/photos/13516346/pexels-photo-13516346.jpeg',
     amenities: ['Pool', 'Beach Access', 'Restaurant'],
   },
   {

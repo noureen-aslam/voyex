@@ -1,11 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Menu, X, Plane } from 'lucide-react';
+import { Menu, X, Plane, LogOut, User } from 'lucide-react';
 import { useState } from 'react';
+import { useTripContext } from '../context/TripContext';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const { user, logout, isAuthenticated } = useTripContext();
 
   const links = [
     { name: 'Home', path: '/' },
@@ -46,12 +48,29 @@ const Navbar = () => {
                 {link.name}
               </Link>
             ))}
-            <Link
-              to="/login"
-              className="ml-4 px-6 py-2 rounded-lg bg-gradient-to-r from-brand-indigo to-brand-cyan text-white font-semibold hover:shadow-lg hover:shadow-brand-indigo/50 transition-all duration-300"
-            >
-              Login
-            </Link>
+
+            {isAuthenticated ? (
+              <div className="flex items-center ml-4 gap-4">
+                <div className="flex items-center text-gray-300 text-sm bg-white/5 px-3 py-2 rounded-lg">
+                  <User className="w-4 h-4 mr-2 text-brand-cyan" />
+                  {user?.fullName.split(' ')[0]}
+                </div>
+                <button 
+                  onClick={logout}
+                  className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                  title="Logout"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className="ml-4 px-6 py-2 rounded-lg bg-gradient-to-r from-brand-indigo to-brand-cyan text-white font-semibold hover:shadow-lg hover:shadow-brand-indigo/50 transition-all duration-300"
+              >
+                Login
+              </Link>
+            )}
           </div>
 
           <button
@@ -62,39 +81,6 @@ const Navbar = () => {
           </button>
         </div>
       </div>
-
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="md:hidden bg-dark-card/95 backdrop-blur-xl border-t border-white/5"
-        >
-          <div className="px-4 py-4 space-y-2">
-            {links.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                onClick={() => setIsOpen(false)}
-                className={`block px-4 py-3 rounded-lg transition-all duration-300 ${
-                  isActive(link.path)
-                    ? 'bg-gradient-to-r from-brand-indigo to-brand-cyan text-white'
-                    : 'text-gray-300 hover:bg-white/5'
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
-            <Link
-              to="/login"
-              onClick={() => setIsOpen(false)}
-              className="block px-4 py-3 rounded-lg bg-gradient-to-r from-brand-indigo to-brand-cyan text-white font-semibold text-center"
-            >
-              Login
-            </Link>
-          </div>
-        </motion.div>
-      )}
     </nav>
   );
 };

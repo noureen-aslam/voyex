@@ -4,9 +4,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Plane } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
 import { login } from '../lib/api';
+import { useTripContext } from '../context/TripContext';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { loginUser } = useTripContext(); // Access the login action
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,10 +22,11 @@ const Login = () => {
 
     try {
       const response = await login(email, password);
-      localStorage.setItem('voyexUser', JSON.stringify(response.user));
-      navigate('/my-trips');
+      if (response.success && response.user) {
+        loginUser(response.user); // Save to Context + LocalStorage
+        navigate('/my-trips');
+      }
     } catch (error: any) {
-      // If backend returns 404, the user doesn't exist
       if (error.message?.includes('404')) {
         setErrorMessage(
           <div className="text-center">
@@ -82,7 +85,7 @@ const Login = () => {
               </div>
             </div>
 
-            <button disabled={isSubmitting} className="w-full py-3 bg-gradient-to-r from-brand-indigo to-brand-cyan text-white font-bold rounded-lg transition-all disabled:opacity-50">
+            <button disabled={isSubmitting} className="w-full py-3 bg-gradient-to-r from-brand-indigo to-brand-cyan text-white font-bold rounded-lg transition-all disabled:opacity-50 hover:shadow-lg hover:shadow-brand-indigo/30">
               {isSubmitting ? 'Logging in...' : 'Login'}
             </button>
 
