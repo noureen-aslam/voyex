@@ -18,27 +18,21 @@ public class TripServlet extends BaseJsonServlet {
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // 1. Try to get userId from the Session first (set during Login)
         HttpSession session = request.getSession(false);
         Long userId = (session != null) ? (Long) session.getAttribute("userId") : null;
 
-        // 2. Fallback: Check for ?userId= query parameter
         if (userId == null) {
             String paramId = request.getParameter("userId");
-            if (paramId != null) {
-                userId = Long.parseLong(paramId);
-            }
+            if (paramId != null) userId = Long.parseLong(paramId);
         }
 
-        // 3. If still no user, we can't show trips
         if (userId == null) {
-            writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, Map.of("message", "Please log in to view trips."));
+            writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, Map.of("message", "Login required."));
             return;
         }
 
         try {
             List<Trip> trips = tripDao.getTripsByUserId(userId);
-            // Wrap in an object so React can easily map it
             writeJson(response, HttpServletResponse.SC_OK, Map.of("trips", trips));
         } catch (SQLException ex) {
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, Map.of("message", "Error fetching trips."));
@@ -49,43 +43,39 @@ public class TripServlet extends BaseJsonServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Map<String, Object> body = GSON.fromJson(request.getReader(), Map.class);
         
-        // Attempt to get user ID from session if missing in body
-        HttpSession session = request.getSession(false);
-        Object userIdObj = (body != null) ? body.get("userId") : null;
-        
-        if (userIdObj == null && session != null) {
-            userIdObj = session.getAttribute("userId");
-        }
-
-        if (userIdObj == null) {
-            writeJson(response, HttpServletResponse.SC_BAD_REQUEST, Map.of("message", "User identification missing."));
-            return;
-        }
-
         try {
+            // ACTION CHECK: Handle Payment Confirmation
+            if (body.containsKey("action") && "PAYMENT_SUCCESS".equals(body.get("action"))) {
+                long bId = convertToLong(body.get("bookingId"));
+                boolean updated = tripDao.updateTripStatus(bId, "CONFIRMED");
+                writeJson(response, HttpServletResponse.SC_OK, Map.of("success", updated));
+                return;
+            }
+
+            // DEFAULT: Create New Booking
             Trip trip = new Trip();
-            trip.setUserId(convertToLong(userIdObj));
+            trip.setUserId(convertToLong(body.get("userId")));
             trip.setDestination(asString(body.get("destination")));
             trip.setStartDate(asString(body.get("startDate")));
             trip.setEndDate(asString(body.get("endDate")));
             trip.setTravelers(convertToInt(body.get("travelers")));
+            trip.setTotalPrice(new BigDecimal(asString(body.get("totalPrice"))));
+            trip.setStatus("PENDING");
             
-            String priceStr = asString(body.get("totalPrice"));
-            trip.setTotalPrice(new BigDecimal(priceStr != null ? priceStr : "0"));
-            trip.setStatus(asString(body.get("status")));
-            
-            Object pId = body.get("packageId");
-            trip.setPackageId(pId != null ? convertToLong(pId) : null);
+            // New Passenger Details
+            trip.setGuestName(asString(body.get("guestName")));
+            trip.setPhoneNumber(asString(body.get("phoneNumber")));
+            trip.setAddress(asString(body.get("address")));
 
             long bookingId = tripDao.createBooking(trip);
             writeJson(response, HttpServletResponse.SC_CREATED, Map.of("bookingId", bookingId, "success", true));
             
         } catch (Exception ex) {
-            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, Map.of("message", "Save failed: " + ex.getMessage()));
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, Map.of("message", ex.getMessage()));
         }
     }
 
-    private String asString(Object val) { return val == null ? null : String.valueOf(val); }
+    private String asString(Object val) { return val == null ? "" : String.valueOf(val); }
     private Long convertToLong(Object val) { return ((Number) val).longValue(); }
     private int convertToInt(Object val) { return ((Number) val).intValue(); }
 }
