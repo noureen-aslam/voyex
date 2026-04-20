@@ -8,7 +8,7 @@ import { useTripContext } from '../context/TripContext';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { loginUser } = useTripContext(); // Access the login action
+  const { loginUser } = useTripContext();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,22 +22,40 @@ const Login = () => {
 
     try {
       const response = await login(email, password);
-      if (response.success && response.user) {
-        loginUser(response.user); // Save to Context + LocalStorage
-        navigate('/my-trips');
+      
+      // Verification: Ensure the backend actually sent a success flag and a token
+      if (response.success && response.token) {
+        
+        // 1. CRITICAL: Save the token immediately. 
+        // This stops the "Session Expired" redirect on the next page.
+        localStorage.setItem("token", response.token);
+        
+        // 2. Save user data to your Global Context (Context + LocalStorage)
+        loginUser(response.user); 
+        
+        // 3. Small delay to ensure storage is written before jumping pages
+        setTimeout(() => {
+          navigate('/my-trips');
+        }, 100);
+
+      } else {
+        setErrorMessage('Login successful, but session could not be established.');
       }
     } catch (error: any) {
+      // Handle "Account not found" specifically
       if (error.message?.includes('404')) {
         setErrorMessage(
           <div className="text-center">
-            <p>Account not found.</p>
-            <Link to="/register" className="text-brand-cyan font-bold underline">
+            <p className="mb-1">Account not found.</p>
+            <Link to="/register" className="text-brand-cyan font-bold hover:underline">
               Create a VOYEX account?
             </Link>
           </div>
         );
+      } else if (error.message?.includes('401')) {
+        setErrorMessage('Invalid email or password.');
       } else {
-        setErrorMessage(error.message || 'Login failed. Please try again.');
+        setErrorMessage(error.message || 'Unable to connect to the server.');
       }
     } finally {
       setIsSubmitting(false);
@@ -46,21 +64,28 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-dark-bg flex items-center justify-center p-6">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        className="w-full max-w-md"
+      >
         <div className="text-center mb-8">
           <Plane className="w-12 h-12 text-brand-cyan mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-white font-syne">Welcome Back</h1>
+          <p className="text-gray-400 mt-2">Sign in to access your dashboard</p>
         </div>
         
         <GlassCard className="p-8">
           <form onSubmit={handleLogin} className="space-y-6">
+            {/* Email Field */}
             <div>
               <label className="text-gray-400 text-sm mb-2 block">Email</label>
               <div className="flex items-center space-x-2 bg-dark-lighter/50 rounded-lg px-4 py-3 border border-white/10 focus-within:border-brand-cyan transition-colors">
                 <Mail className="w-5 h-5 text-gray-400" />
                 <input 
                   type="email" 
-                  className="bg-transparent border-none outline-none text-white w-full" 
+                  placeholder="name@example.com"
+                  className="bg-transparent border-none outline-none text-white w-full placeholder:text-gray-600" 
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
                   required 
@@ -68,36 +93,53 @@ const Login = () => {
               </div>
             </div>
 
+            {/* Password Field */}
             <div>
               <label className="text-gray-400 text-sm mb-2 block">Password</label>
               <div className="flex items-center space-x-2 bg-dark-lighter/50 rounded-lg px-4 py-3 border border-white/10 focus-within:border-brand-cyan transition-colors">
                 <Lock className="w-5 h-5 text-gray-400" />
                 <input 
                   type={showPassword ? 'text' : 'password'} 
-                  className="bg-transparent border-none outline-none text-white w-full" 
+                  placeholder="••••••••"
+                  className="bg-transparent border-none outline-none text-white w-full placeholder:text-gray-600" 
                   value={password} 
                   onChange={(e) => setPassword(e.target.value)} 
                   required 
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? <EyeOff className="w-5 h-5 text-gray-400" /> : <Eye className="w-5 h-5 text-gray-400" />}
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="focus:outline-none">
+                  {showPassword ? <EyeOff className="w-5 h-5 text-gray-400 hover:text-white" /> : <Eye className="w-5 h-5 text-gray-400 hover:text-white" />}
                 </button>
               </div>
             </div>
 
-            <button disabled={isSubmitting} className="w-full py-3 bg-gradient-to-r from-brand-indigo to-brand-cyan text-white font-bold rounded-lg transition-all disabled:opacity-50 hover:shadow-lg hover:shadow-brand-indigo/30">
-              {isSubmitting ? 'Logging in...' : 'Login'}
-            </button>
-
+            {/* Error Message Display */}
             {errorMessage && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }} 
+                animate={{ opacity: 1, scale: 1 }}
+                className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm"
+              >
                 {errorMessage}
-              </div>
+              </motion.div>
             )}
+
+            {/* Submit Button */}
+            <button 
+              type="submit"
+              disabled={isSubmitting} 
+              className="w-full py-3 bg-gradient-to-r from-brand-indigo to-brand-cyan text-white font-bold rounded-lg transition-all disabled:opacity-50 hover:shadow-lg hover:shadow-brand-indigo/30 active:scale-95"
+            >
+              {isSubmitting ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Authenticating...</span>
+                </div>
+              ) : 'Login'}
+            </button>
           </form>
           
           <p className="mt-6 text-center text-sm text-gray-400">
-            New to VOYEX? <Link to="/register" className="text-brand-cyan font-semibold">Sign Up</Link>
+            New to VOYEX? <Link to="/register" className="text-brand-cyan font-semibold hover:underline">Sign Up</Link>
           </p>
         </GlassCard>
       </motion.div>
