@@ -2,7 +2,12 @@ package com.voyex.model;
 
 import java.math.BigDecimal;
 
+/**
+ * Trip Model Class
+ * Represents a journey within the Voyex system.
+ */
 public class Trip {
+    // --- Existing Fields ---
     private long id;
     private long userId;
     private Long packageId;
@@ -12,6 +17,16 @@ public class Trip {
     private int travelers;
     private BigDecimal totalPrice;
     private String status;
+
+    // --- Missing Fields (Required by TripDao and TripServlet) ---
+    private String guestName;
+    private String phoneNumber;
+    private String address;
+
+    // --- Constructors ---
+    public Trip() {}
+
+    // --- Standard Getters and Setters ---
 
     public long getId() {
         return id;
@@ -83,5 +98,31 @@ public class Trip {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    // --- Newly Added Getters and Setters for Compilation Fix ---
+
+    public String getGuestName() {
+        return guestName;
+    }
+
+    public void setGuestName(String guestName) {
+        this.guestName = guestName;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
     }
 }
