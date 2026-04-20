@@ -1,3 +1,5 @@
+// --- Interfaces ---
+
 export interface TravelPackage {
   id: number;
   name: string;
@@ -34,100 +36,139 @@ interface LoginResponse {
   message?: string;
 }
 
-interface ApiErrorPayload {
-  message?: string;
-}
+// --- Configuration ---
 
-// 1. Base URL Configuration
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://voyex.onrender.com';
 const API_BASE_URL = BASE_URL.replace(/\/$/, '');
 
 /**
+ * Helper to get user data safely from LocalStorage
+ */
+const getStoredUser = (): User | null => {
+  const data = localStorage.getItem("user");
+  if (!data) return null;
+  try {
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Core fetch wrapper
- * Fixed: Now retrieves the token INSIDE the function call to avoid 401 errors.
+ * Ensures Java Sessions (JSESSIONID) and Auth tokens are handled correctly.
  */
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const urlPath = path.startsWith('/') ? path : `/${path}`;
-  
-  // Always get the most recent token from storage
   const token = localStorage.getItem("token");
 
   const response = await fetch(`${API_BASE_URL}${urlPath}`, {
-    credentials: 'omit',
+    // IMPORTANT: 'include' allows Java Sessions/Cookies to work across domains
+    credentials: 'include', 
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      ...(init?.headers || {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers || {}),
     },
     ...init,
   });
 
   if (!response.ok) {
-    let message = `Request failed with status ${response.status}`;
+    let message = `Error ${response.status}`;
     try {
-      const errorBody = (await response.json()) as ApiErrorPayload;
-      if (errorBody?.message) message = errorBody.message;
-    } catch (e) { /* ignore json parse error */ }
+      const errorBody = await response.json();
+      message = errorBody.message || message;
+    } catch (e) { /* ignore parse error */ }
     
-    // Special handling for 401s to help debugging
+    // If 401 Unauthorized, we might want to clear local storage
     if (response.status === 401) {
-       console.error("Auth Error: Token is missing or invalid.");
+      console.warn("Session expired or unauthorized.");
     }
+    
     throw new Error(message);
   }
 
   return response.json() as Promise<T>;
 }
 
-// 2. Authentication Actions
+// --- API Actions ---
+
+/**
+ * Authenticates user and saves both the Session Token and User Object
+ */
 export const login = async (email: string, password: string) => {
   const response = await apiFetch<LoginResponse>('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
 
-  if (response.token) {
+  if (response.success && response.token) {
     localStorage.setItem("token", response.token);
+    localStorage.setItem("user", JSON.stringify(response.user));
   }
 
   return response;
 };
 
-export const register = (email: string, password: string, fullName: string) => 
-  apiFetch<LoginResponse>('/api/auth/register', {
-    method: 'POST',
-    body: JSON.stringify({ email, password, fullName }),
-  });
+/**
+ * Fetches trips specifically for the logged-in user
+ */
+export const getMyTrips = async (): Promise<Trip[]> => {
+  const user = getStoredUser();
+  
+  if (!user) {
+    console.error("Cannot fetch trips: No user found in storage.");
+    return [];
+  }
 
-// 3. Data Actions
-export const getPackages = async () => {
-  const response = await apiFetch<{ packages: TravelPackage[] }>('/api/packages');
-  return response.packages || [];
+  try {
+    // We pass userId as a query param to match your Java Servlet doGet
+    const response = await apiFetch<any>(`/api/trips?userId=${user.id}`);
+    
+    // Handling Java Map.of("trips", trips) format
+    if (response.trips && Array.isArray(response.trips)) {
+      return response.trips;
+    }
+    
+    // Fallback if backend returns raw array
+    if (Array.isArray(response)) {
+      return response;
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Failed to fetch trips:", error);
+    return [];
+  }
 };
 
-export const createTripBooking = (payload: any) => 
-  apiFetch<{ bookingId: number; message: string }>('/api/trips', {
-    method: 'POST',
-    body: JSON.stringify(payload),
+/**
+ * Registers a new user
+ */
+export const register = (email: string, password: string, fullName: string) => 
+  apiFetch<LoginResponse>('/api/auth/register', { 
+    method: 'POST', 
+    body: JSON.stringify({ email, password, fullName }) 
   });
 
 /**
- * Fixed: Added a fallback in case your backend returns a raw array 
- * instead of an object with a "trips" key.
+ * Fetches available travel packages
  */
-export const getMyTrips = async (): Promise<Trip[]> => {
-  const response = await apiFetch<any>('/api/trips');
-  
-  // If backend returns { trips: [...] }
-  if (response.trips && Array.isArray(response.trips)) {
-    return response.trips;
-  }
-  
-  // If backend returns [...] directly
-  if (Array.isArray(response)) {
-    return response;
-  }
+export const getPackages = () => 
+  apiFetch<{ packages: TravelPackage[] }>('/api/packages')
+    .then(res => res.packages || []);
 
-  return [];
+/**
+ * Creates a new trip booking, automatically attaching the userId
+ */
+export const createTripBooking = (payload: any) => {
+  const user = getStoredUser();
+  return apiFetch<any>('/api/trips', { 
+    method: 'POST', 
+    body: JSON.stringify({ 
+      ...payload, 
+      userId: user?.id // Auto-inject ID from storage
+    }) 
+  });
 };

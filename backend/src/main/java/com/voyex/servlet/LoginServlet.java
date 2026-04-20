@@ -17,7 +17,6 @@ public class LoginServlet extends BaseJsonServlet {
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // Read JSON from request body using GSON from BaseJsonServlet
         Map<String, String> loginRequest = GSON.fromJson(request.getReader(), Map.class);
         
         if (loginRequest == null) {
@@ -28,14 +27,12 @@ public class LoginServlet extends BaseJsonServlet {
         String email = loginRequest.get("email");
         String password = loginRequest.get("password");
 
-        // Basic Validation
         if (email == null || password == null || email.isBlank() || password.isBlank()) {
             writeJson(response, HttpServletResponse.SC_BAD_REQUEST, Map.of("message", "Email and password are required."));
             return;
         }
 
         try {
-            // Check database for user
             Optional<User> userOptional = userDao.validateLogin(email, password);
             
             if (userOptional.isEmpty()) {
@@ -48,11 +45,14 @@ public class LoginServlet extends BaseJsonServlet {
             // Handle Session Logic
             HttpSession session = request.getSession(true);
             session.setAttribute("userId", user.getId());
-            session.setAttribute("userEmail", user.getEmail());
 
-            // Send successful response with user data for React to store in localStorage
+            // FIX: Generate a simple token (or use Session ID) so the frontend has something to store
+            String token = session.getId(); 
+
+            // Send successful response
             writeJson(response, HttpServletResponse.SC_OK, Map.of(
                 "success", true,
+                "token", token, // CRITICAL: React needs this field!
                 "message", "Login successful.",
                 "user", Map.of(
                     "id", user.getId(),
@@ -62,9 +62,8 @@ public class LoginServlet extends BaseJsonServlet {
             ));
 
         } catch (SQLException ex) {
-            System.err.println("Login DB Error: " + ex.getMessage());
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-                Map.of("message", "Database error during login."));
+                Map.of("message", "Database error."));
         }
     }
 }
