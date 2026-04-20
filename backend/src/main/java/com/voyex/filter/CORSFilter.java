@@ -20,9 +20,10 @@ public class CORSFilter implements Filter {
         HttpServletResponse httpResponse = (HttpServletResponse) response;
 
         String origin = httpRequest.getHeader("Origin");
-        if (origin == null || origin.isBlank()) {
-            origin = "*";
-        }
+if ("https://voyex-bay.vercel.app".equals(origin)) {
+    httpResponse.setHeader("Access-Control-Allow-Origin", origin);
+}
+
 
         httpResponse.setHeader("Access-Control-Allow-Origin", origin);
         httpResponse.setHeader("Vary", "Origin");
