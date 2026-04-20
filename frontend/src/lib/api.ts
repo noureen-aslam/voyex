@@ -44,15 +44,17 @@ const API_BASE_URL = BASE_URL.replace(/\/$/, '');
  */
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const urlPath = path.startsWith('/') ? path : `/${path}`;
-  
-  // Change this in your apiFetch function
-const response = await fetch(`${API_BASE_URL}${urlPath}`, {
-  credentials: 'omit', // Change from 'include' to 'omit'
-  headers: {
-    'Content-Type': 'application/json',
-    // ... existing headers ...
+
+  // Get token from localStorage (after login)
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(`${API_BASE_URL}${urlPath}`, {
+    credentials: 'omit',
+    headers: {
+      'Content-Type': 'application/json',
       'Accept': 'application/json',
       ...(init?.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     ...init,
   });
@@ -69,11 +71,23 @@ const response = await fetch(`${API_BASE_URL}${urlPath}`, {
   return response.json() as Promise<T>;
 }
 
-export const login = (email: string, password: string) => 
-  apiFetch<LoginResponse>('/api/auth/login', {
+
+
+
+export const login = async (email: string, password: string) => {
+  const response = await apiFetch<{ token: string; user: any }>('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
+
+  // Save token for later API calls
+  if (response.token) {
+    localStorage.setItem("token", response.token);
+  }
+
+  return response;
+};
+
 
 export const register = (email: string, password: string, fullName: string) => 
   apiFetch<LoginResponse>('/api/auth/register', {
