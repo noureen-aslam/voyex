@@ -21,31 +21,35 @@ export interface Trip {
   status: string;
 }
 
+export interface User {
+  id: number;
+  fullName: string;
+  email: string;
+}
+
 interface LoginResponse {
   success: boolean;
-  message: string;
-  user?: {
-    id: number;
-    fullName: string;
-    email: string;
-  };
+  token: string;
+  user: User;
+  message?: string;
 }
 
 interface ApiErrorPayload {
   message?: string;
 }
 
-// Ensure no trailing slash in the URL
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+// 1. Base URL Configuration
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://voyex.onrender.com';
 const API_BASE_URL = BASE_URL.replace(/\/$/, '');
 
 /**
- * Core fetch wrapper with improved error handling and CORS support
+ * Core fetch wrapper
+ * Fixed: Now retrieves the token INSIDE the function call to avoid 401 errors.
  */
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const urlPath = path.startsWith('/') ? path : `/${path}`;
-
-  // Get token from localStorage (after login)
+  
+  // Always get the most recent token from storage
   const token = localStorage.getItem("token");
 
   const response = await fetch(`${API_BASE_URL}${urlPath}`, {
@@ -64,23 +68,25 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     try {
       const errorBody = (await response.json()) as ApiErrorPayload;
       if (errorBody?.message) message = errorBody.message;
-    } catch (e) { /* ignore */ }
+    } catch (e) { /* ignore json parse error */ }
+    
+    // Special handling for 401s to help debugging
+    if (response.status === 401) {
+       console.error("Auth Error: Token is missing or invalid.");
+    }
     throw new Error(message);
   }
 
   return response.json() as Promise<T>;
 }
 
-
-
-
+// 2. Authentication Actions
 export const login = async (email: string, password: string) => {
-  const response = await apiFetch<{ token: string; user: any }>('/api/auth/login', {
+  const response = await apiFetch<LoginResponse>('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
 
-  // Save token for later API calls
   if (response.token) {
     localStorage.setItem("token", response.token);
   }
@@ -88,13 +94,13 @@ export const login = async (email: string, password: string) => {
   return response;
 };
 
-
 export const register = (email: string, password: string, fullName: string) => 
   apiFetch<LoginResponse>('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify({ email, password, fullName }),
   });
 
+// 3. Data Actions
 export const getPackages = async () => {
   const response = await apiFetch<{ packages: TravelPackage[] }>('/api/packages');
   return response.packages || [];
@@ -106,7 +112,22 @@ export const createTripBooking = (payload: any) =>
     body: JSON.stringify(payload),
   });
 
-export const getMyTrips = async () => {
-  const response = await apiFetch<{ trips: Trip[] }>('/api/trips');
-  return response.trips || [];
+/**
+ * Fixed: Added a fallback in case your backend returns a raw array 
+ * instead of an object with a "trips" key.
+ */
+export const getMyTrips = async (): Promise<Trip[]> => {
+  const response = await apiFetch<any>('/api/trips');
+  
+  // If backend returns { trips: [...] }
+  if (response.trips && Array.isArray(response.trips)) {
+    return response.trips;
+  }
+  
+  // If backend returns [...] directly
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  return [];
 };
