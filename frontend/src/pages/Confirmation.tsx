@@ -1,10 +1,9 @@
 import { motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Phone, Mail, Car, MapPin, Calendar, Download, Share2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Check, Download, Share2, AlertCircle, ShieldCheck } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
 import { useTripContext } from '../context/TripContext';
-import { drivers } from '../data/mockData';
 import { createTripBooking } from '../lib/api';
 import confetti from 'canvas-confetti';
 import { jsPDF } from 'jspdf';
@@ -18,13 +17,46 @@ const Confirmation = () => {
   const [isSyncing, setIsSyncing] = useState(true);
   const hasBookedRef = useRef(false);
 
-  const driver = drivers[0];
   const totalPrice = calculateTotalCost();
 
   // Canvas ref
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // --- Helper Functions ---
+  const syncBooking = async () => {
+    if (!user) {
+      setBookingError("Please login to save your booking.");
+      setBookingId("Unauthorized");
+      setIsSyncing(false);
+      return null;
+    }
+
+    setIsSyncing(true);
+    setBookingError('');
+
+    try {
+      const response = await createTripBooking({
+        userId: user.id,
+        destination: tripData.destination,
+        startDate: tripData.startDate,
+        endDate: tripData.endDate,
+        travelers: tripData.travelers,
+        totalPrice,
+        status: 'PENDING'
+      });
+      const finalId = `VOYEX${response.bookingId}`;
+      setBookingId(finalId);
+      if (setActiveBookingId) setActiveBookingId(finalId);
+      return finalId;
+    } catch (error: any) {
+      setBookingError(error.message || 'Connection to server failed.');
+      setBookingId('Not Created');
+      return null;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const downloadTicketPDF = () => {
     if (bookingId === 'Pending...' || bookingId === 'Not Created') {
       alert("Please wait for the booking to be confirmed before downloading.");
@@ -116,37 +148,10 @@ const Confirmation = () => {
   }, []);
 
   useEffect(() => {
-    const createBooking = async () => {
-      if (!user) {
-        setBookingError("Please login to save your booking.");
-        setBookingId("Unauthorized");
-        setIsSyncing(false);
-        return;
-      }
-      try {
-        const response = await createTripBooking({
-          userId: user.id,
-          destination: tripData.destination,
-          startDate: tripData.startDate,
-          endDate: tripData.endDate,
-          travelers: tripData.travelers,
-          totalPrice,
-          status: 'PENDING'
-        });
-        const finalId = `VOYEX${response.bookingId}`;
-        setBookingId(finalId);
-        if (setActiveBookingId) setActiveBookingId(finalId);
-      } catch (error: any) {
-        setBookingError(error.message || 'Connection to server failed.');
-        setBookingId('Not Created');
-      } finally {
-        setIsSyncing(false);
-      }
-    };
     if (hasBookedRef.current) return;
     if (tripData.destination && tripData.startDate) {
       hasBookedRef.current = true;
-      createBooking();
+      syncBooking();
     }
   }, [totalPrice, tripData, user, setActiveBookingId]);
 
@@ -198,12 +203,35 @@ const Confirmation = () => {
 
           <div className="space-y-4">
             <button
-              onClick={() => navigate('/payment', { state: { bookingId } })}
-              disabled={isSyncing || bookingId === 'Not Created' || bookingId === 'Unauthorized'}
+              onClick={async () => {
+                if (bookingId === 'Unauthorized') {
+                  navigate('/login');
+                  return;
+                }
+
+                const finalBookingId =
+                  bookingId !== 'Not Created' && bookingId !== 'Pending...'
+                    ? bookingId
+                    : await syncBooking();
+
+                if (finalBookingId) {
+                  navigate('/payment', { state: { bookingId: finalBookingId } });
+                }
+              }}
+              disabled={isSyncing}
               className="w-full py-4 bg-gradient-to-r from-brand-indigo to-brand-cyan text-white font-bold rounded-xl shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <ShieldCheck className="w-5 h-5" /> Proceed to Payment
             </button>
+            {bookingError && (
+              <button
+                onClick={syncBooking}
+                disabled={isSyncing || bookingId === 'Unauthorized'}
+                className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-xl flex items-center justify-center gap-2 hover:bg-white/10 transition-all disabled:opacity-50"
+              >
+                Retry Booking Sync
+              </button>
+            )}
             <button onClick={downloadTicketPDF} className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-xl flex items-center justify-center gap-2 hover:bg-white/10 transition-all">
               <Download className="w-4 h-4" /> Download PDF
             </button>
