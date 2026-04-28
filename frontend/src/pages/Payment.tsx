@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import GlassCard from '../components/GlassCard';
 import { useTripContext } from '../context/TripContext';
+import { confirmTripPayment } from '../lib/api';
 
 const Payment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { calculateTotalCost } = useTripContext();
+  const { calculateTotalCost, activeBookingId } = useTripContext();
 
-  const bookingId = location.state?.bookingId;
+  const bookingId = location.state?.bookingId || activeBookingId || localStorage.getItem('voyexActiveBookingId');
 
   const [method, setMethod] = useState('card');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -34,25 +35,7 @@ const Payment = () => {
     setError('');
 
     try {
-      const numericId = String(bookingId).replace('VOYEX', '');
-      const token = localStorage.getItem("token");
-
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/payments/confirm`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ bookingId: numericId }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Payment verification failed on server.");
-      }
-
+      await confirmTripPayment(bookingId);
       navigate('/my-trips', { state: { paymentSuccess: true } });
     } catch (err: any) {
       setError(err.message || "Payment failed. Please try again.");

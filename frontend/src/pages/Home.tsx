@@ -233,51 +233,55 @@ const Home = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      {/* --- HOW IT WORKS SECTION --- */}
+<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+  <motion.div
+    initial={{ opacity: 0 }}
+    whileInView={{ opacity: 1 }}
+    viewport={{ once: true }}
+    className="text-center mb-16"
+  >
+    <h2 className="text-3xl sm:text-4xl font-bold font-syne text-white mb-4">
+      How It Works
+    </h2>
+    <p className="text-gray-400">Six simple steps to your perfect journey</p>
+  </motion.div>
+
+  <div className="relative">
+    {/* 1. Added z-0 to keep the line at the very bottom of the stack */}
+    <div className="absolute left-1/2 transform -translate-x-1/2 h-full w-1 bg-gradient-to-b from-brand-indigo via-brand-cyan to-brand-indigo hidden lg:block z-0" />
+
+    {/* 2. Added relative z-10 to the steps container so cards are above the line */}
+    <div className="relative z-10 space-y-8">
+      {steps.map((step, index) => (
         <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
+          key={step.number}
+          initial={{ opacity: 0, x: index % 2 === 0 ? -50 : 50 }}
+          whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          transition={{ delay: index * 0.1 }}
+          className={`flex items-center gap-8 ${
+            index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'
+          }`}
         >
-          <h2 className="text-3xl sm:text-4xl font-bold font-syne text-white mb-4">
-            How It Works
-          </h2>
-          <p className="text-gray-400">Six simple steps to your perfect journey</p>
-        </motion.div>
-
-        <div className="relative">
-          <div className="absolute left-1/2 transform -translate-x-1/2 h-full w-1 bg-gradient-to-b from-brand-indigo via-brand-cyan to-brand-indigo hidden lg:block" />
-
-          <div className="space-y-8">
-            {steps.map((step, index) => (
-              <motion.div
-                key={step.number}
-                initial={{ opacity: 0, x: index % 2 === 0 ? -50 : 50 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className={`flex items-center gap-8 ${
-                  index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'
-                }`}
-              >
-                <div className={`flex-1 ${index % 2 === 0 ? 'lg:text-right' : 'lg:text-left'}`}>
-                  <GlassCard className="p-6">
-                    <h3 className="text-xl font-bold text-white mb-2">{step.title}</h3>
-                    <p className="text-gray-400">{step.description}</p>
-                  </GlassCard>
-                </div>
-
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-indigo to-brand-cyan flex items-center justify-center text-white font-bold text-xl font-syne shadow-lg shadow-brand-indigo/50 flex-shrink-0">
-                  {step.number}
-                </div>
-
-                <div className="flex-1 hidden lg:block" />
-              </motion.div>
-            ))}
+          <div className={`flex-1 ${index % 2 === 0 ? 'lg:text-right' : 'lg:text-left'}`}>
+            <GlassCard className="p-6">
+              <h3 className="text-xl font-bold text-white mb-2">{step.title}</h3>
+              <p className="text-gray-400">{step.description}</p>
+            </GlassCard>
           </div>
-        </div>
-      </div>
+
+          {/* 3. Added z-20 to ensure the circle is the topmost element in the center */}
+          <div className="relative z-20 w-16 h-16 rounded-full bg-gradient-to-br from-brand-indigo to-brand-cyan flex items-center justify-center text-white font-bold text-xl font-syne shadow-lg shadow-brand-indigo/50 flex-shrink-0">
+            {step.number}
+          </div>
+
+          <div className="flex-1 hidden lg:block" />
+        </motion.div>
+      ))}
+    </div>
+  </div>
+</div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <motion.div

@@ -1,10 +1,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Check, Phone, Mail, Car, MapPin, 
-  Calendar, Download, Share2, AlertCircle, ShieldCheck 
-} from 'lucide-react';
+import { Check, Phone, Mail, Car, MapPin, Calendar, Download, Share2, AlertCircle, ShieldCheck } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
 import { useTripContext } from '../context/TripContext';
 import { drivers } from '../data/mockData';
@@ -15,49 +12,84 @@ import { jsPDF } from 'jspdf';
 const Confirmation = () => {
   const navigate = useNavigate();
   const { tripData, calculateTotalCost, user, setActiveBookingId } = useTripContext();
-  
+
   const [bookingId, setBookingId] = useState('Pending...');
   const [bookingError, setBookingError] = useState('');
   const [isSyncing, setIsSyncing] = useState(true);
-  
   const hasBookedRef = useRef(false);
-  const driver = drivers[0]; 
+
+  const driver = drivers[0];
   const totalPrice = calculateTotalCost();
 
-  // --- Helper Functions ---
+  // Canvas ref
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const downloadTicket = () => {
+  // --- Helper Functions ---
+  const downloadTicketPDF = () => {
     if (bookingId === 'Pending...' || bookingId === 'Not Created') {
       alert("Please wait for the booking to be confirmed before downloading.");
       return;
     }
-
     const doc = new jsPDF();
-    
-    // Design the PDF
     doc.setFontSize(22);
-    doc.setTextColor(0, 245, 255); // Brand Cyan color
+    doc.setTextColor(0, 245, 255);
     doc.text("VOYEX TRAVEL TICKET", 20, 20);
-    
     doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0); // Black text
+    doc.setTextColor(0, 0, 0);
     doc.text(`Booking ID: ${bookingId}`, 20, 40);
     doc.text(`Passenger: ${user?.fullName || 'Guest'}`, 20, 50);
     doc.text(`Destination: ${tripData.destination}`, 20, 60);
     doc.text(`Dates: ${tripData.startDate} to ${tripData.endDate}`, 20, 70);
     doc.text(`Travelers: ${tripData.travelers}`, 20, 80);
     doc.text(`Total Price: INR ${totalPrice.toLocaleString()}`, 20, 90);
-    
-    doc.setDrawColor(200, 200, 200);
     doc.line(20, 100, 190, 100);
-    
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     doc.text("Present this digital or printed ticket at the departure point.", 20, 110);
     doc.text("Thank you for choosing Voyex!", 20, 120);
-
-    // Save the PDF
     doc.save(`Voyex_Ticket_${bookingId}.pdf`);
+  };
+
+  const drawTicketCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Background
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Title
+    ctx.fillStyle = "#00F5FF";
+    ctx.font = "bold 24px Arial";
+    ctx.fillText("VOYEX TRAVEL TICKET", 40, 50);
+
+    // Trip details
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "16px Arial";
+    ctx.fillText(`Booking ID: ${bookingId}`, 40, 100);
+    ctx.fillText(`Passenger: ${user?.fullName || "Guest"}`, 40, 130);
+    ctx.fillText(`Destination: ${tripData.destination}`, 40, 160);
+    ctx.fillText(`Dates: ${tripData.startDate} to ${tripData.endDate}`, 40, 190);
+    ctx.fillText(`Travelers: ${tripData.travelers}`, 40, 220);
+    ctx.fillText(`Total Price: ₹${totalPrice.toLocaleString()}`, 40, 250);
+
+    // Footer
+    ctx.fillStyle = "#888";
+    ctx.font = "12px Arial";
+    ctx.fillText("Thank you for choosing VOYEX!", 40, 300);
+  };
+
+  const downloadCanvasImage = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = `Voyex_Ticket_${bookingId}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
   };
 
   const shareItinerary = async () => {
@@ -66,12 +98,10 @@ const Confirmation = () => {
       text: `I'm heading to ${tripData.destination} with Voyex! Journey starts on ${tripData.startDate}.`,
       url: window.location.origin
     };
-
     try {
       if (navigator.share) {
         await navigator.share(shareData);
       } else {
-        // Fallback for desktop browsers
         await navigator.clipboard.writeText(`${shareData.text} Check it out here: ${shareData.url}`);
         alert("Itinerary details copied to clipboard!");
       }
@@ -81,33 +111,18 @@ const Confirmation = () => {
   };
 
   // --- Effects ---
-
-  // 1. Confetti Effect on mount
   useEffect(() => {
-    confetti({
-      particleCount: 150,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#00F5FF', '#7000FF', '#ffffff']
-    });
+    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#00F5FF', '#7000FF', '#ffffff'] });
   }, []);
 
-  // 2. Database Sync Logic
   useEffect(() => {
     const createBooking = async () => {
       if (!user) {
-        setBookingError("Please login to save your booking to your account.");
+        setBookingError("Please login to save your booking.");
         setBookingId("Unauthorized");
         setIsSyncing(false);
         return;
       }
-
-      if (!tripData.destination || !tripData.startDate) {
-        setBookingError("No trip data found. Please go back and plan a trip.");
-        setIsSyncing(false);
-        return;
-      }
-
       try {
         const response = await createTripBooking({
           userId: user.id,
@@ -118,25 +133,17 @@ const Confirmation = () => {
           totalPrice,
           status: 'PENDING'
         });
-        
         const finalId = `VOYEX${response.bookingId}`;
         setBookingId(finalId);
-        
-        if (setActiveBookingId) {
-          setActiveBookingId(finalId);
-        }
-        
+        if (setActiveBookingId) setActiveBookingId(finalId);
       } catch (error: any) {
-        console.error("Booking Error:", error);
         setBookingError(error.message || 'Connection to server failed.');
         setBookingId('Not Created');
       } finally {
         setIsSyncing(false);
       }
     };
-
     if (hasBookedRef.current) return;
-
     if (tripData.destination && tripData.startDate) {
       hasBookedRef.current = true;
       createBooking();
@@ -146,14 +153,9 @@ const Confirmation = () => {
   return (
     <div className="min-h-screen bg-dark-bg pt-24 pb-12 px-4">
       <div className="max-w-4xl mx-auto">
-        
-        {/* Success Header */}
         <div className="text-center mb-12">
-          <motion.div 
-            initial={{ scale: 0 }} 
-            animate={{ scale: 1 }} 
-            className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-500/50"
-          >
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+            className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-500/50">
             <Check className="w-10 h-10 text-green-500" />
           </motion.div>
           <h1 className="text-4xl font-bold text-white mb-2 font-syne">Trip Reserved!</h1>
@@ -161,108 +163,53 @@ const Confirmation = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Main Trip Details */}
           <div className="lg:col-span-2 space-y-6">
             <GlassCard className="p-8">
-              <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4">
+              <div className="flex justify-between items-start mb-6">
                 <div>
-                  <p className="text-sm text-gray-500 uppercase tracking-widest mb-1">Booking ID</p>
-                  <h2 className="text-2xl font-bold text-brand-cyan font-syne">
-                    {isSyncing ? "Generating..." : bookingId}
-                  </h2>
+                  <p className="text-sm text-gray-500 uppercase">Booking ID</p>
+                  <h2 className="text-2xl font-bold text-brand-cyan">{bookingId}</h2>
                 </div>
-                <div className="md:text-right">
-                  <p className="text-sm text-gray-500 uppercase tracking-widest mb-1">Total Amount</p>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500 uppercase">Total Price</p>
                   <h2 className="text-2xl font-bold text-white">₹{totalPrice.toLocaleString()}</h2>
                 </div>
               </div>
 
               {bookingError && (
-                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400 text-sm">
-                  <AlertCircle className="w-5 h-5" />
-                  <span className="flex-1">{bookingError}</span>
-                  {!user && (
-                    <button onClick={() => navigate('/login')} className="underline font-bold whitespace-nowrap">
-                      Login Now
-                    </button>
-                  )}
+                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 mb-6 flex items-center gap-2">
+                  <AlertCircle size={18} /> {bookingError}
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-white/5 rounded-lg"><Calendar className="w-5 h-5 text-brand-cyan" /></div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase font-bold">Dates</p>
-                    <p className="text-white">{tripData.startDate} — {tripData.endDate}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-white/5 rounded-lg"><MapPin className="w-5 h-5 text-brand-cyan" /></div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase font-bold">Destination</p>
-                    <p className="text-white">{tripData.destination}</p>
-                  </div>
-                </div>
-              </div>
-            </GlassCard>
-
-            <GlassCard className="p-6">
-              <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                <Car className="w-5 h-5 text-brand-cyan" /> Assigned Voyager (Driver)
-              </h3>
-              <div className="flex items-center gap-4">
-                <img 
-                  src={driver.image} 
-                  alt={driver.name} 
-                  className="w-16 h-16 rounded-full object-cover border-2 border-brand-indigo" 
-                />
-                <div className="flex-1">
-                  <h4 className="text-white font-semibold text-lg">{driver.name}</h4>
-                  <p className="text-gray-400 text-sm">Expert Voyager • 4.98 ★</p>
-                </div>
-                <div className="flex gap-2">
-                  <button className="p-3 bg-white/5 rounded-full hover:bg-brand-cyan/20 transition-all text-gray-300 hover:text-brand-cyan">
-                    <Phone className="w-5 h-5" />
+              <div className="mb-8">
+                <canvas ref={canvasRef} width={600} height={350} className="border border-white/10 rounded-lg w-full bg-slate-900" />
+                <div className="flex gap-4 mt-4">
+                  <button onClick={drawTicketCanvas} className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm transition-all border border-white/10">
+                    Preview Ticket
                   </button>
-                  <button className="p-3 bg-white/5 rounded-full hover:bg-brand-cyan/20 transition-all text-gray-300 hover:text-brand-cyan">
-                    <Mail className="w-5 h-5" />
+                  <button onClick={downloadCanvasImage} className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm transition-all border border-white/10">
+                    Download Image
                   </button>
                 </div>
               </div>
             </GlassCard>
           </div>
 
-          {/* Actions Sidebar */}
           <div className="space-y-4">
-            <button 
+            <button
               onClick={() => navigate('/payment', { state: { bookingId } })}
               disabled={isSyncing || bookingId === 'Not Created' || bookingId === 'Unauthorized'}
-              className={`w-full py-4 bg-gradient-to-r from-brand-indigo to-brand-cyan text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 
-                ${(isSyncing || bookingId === 'Not Created') ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'}`}
+              className="w-full py-4 bg-gradient-to-r from-brand-indigo to-brand-cyan text-white font-bold rounded-xl shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              <ShieldCheck className="w-5 h-5" />
-              Proceed to Payment
+              <ShieldCheck className="w-5 h-5" /> Proceed to Payment
             </button>
-            
-            <button 
-              onClick={downloadTicket}
-              className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-xl flex items-center justify-center gap-2 hover:bg-white/10 transition-all"
-            >
-              <Download className="w-4 h-4" /> Download Ticket
+            <button onClick={downloadTicketPDF} className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-xl flex items-center justify-center gap-2 hover:bg-white/10 transition-all">
+              <Download className="w-4 h-4" /> Download PDF
             </button>
-            
-            <button 
-              onClick={shareItinerary}
-              className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-xl flex items-center justify-center gap-2 hover:bg-white/10 transition-all"
-            >
-              <Share2 className="w-4 h-4" /> Share Itinerary
+            <button onClick={shareItinerary} className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-xl flex items-center justify-center gap-2 hover:bg-white/10 transition-all">
+              <Share2 className="w-4 h-4" /> Share Trip
             </button>
-
-            <p className="text-xs text-gray-500 text-center px-4">
-              A copy of your trip details has been sent to your registered email address.
-            </p>
           </div>
         </div>
       </div>

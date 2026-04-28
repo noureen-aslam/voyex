@@ -29,6 +29,7 @@ const Login = () => {
         // 1. CRITICAL: Save the token immediately. 
         // This stops the "Session Expired" redirect on the next page.
         localStorage.setItem("token", response.token);
+        localStorage.setItem("user", JSON.stringify(response.user));
         
         // 2. Save user data to your Global Context (Context + LocalStorage)
         loginUser(response.user); 

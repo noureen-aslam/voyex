@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 // 1. Interfaces
 interface User {
@@ -8,6 +8,7 @@ interface User {
 }
 
 interface TripData {
+  originCity: string;
   destination: string;
   startDate: string;
   endDate: string;
@@ -52,6 +53,7 @@ interface TripContextType {
 
 // 2. Initial States
 const initialTripData: TripData = {
+  originCity: '',
   destination: '',
   startDate: '',
   endDate: '',
@@ -71,13 +73,22 @@ const TripContext = createContext<TripContextType | undefined>(undefined);
 // 3. Provider Component
 export const TripProvider = ({ children }: { children: ReactNode }) => {
   // --- States ---
-  const [tripData, setTripData] = useState<TripData>(initialTripData);
-  const [currentStep, setCurrentStep] = useState(1);
-  const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
+  const [tripData, setTripData] = useState<TripData>(() => {
+    const savedTripData = localStorage.getItem('voyexTripData');
+    return savedTripData ? JSON.parse(savedTripData) : initialTripData;
+  });
+  const [currentStep, setCurrentStep] = useState(() => {
+    const savedStep = localStorage.getItem('voyexCurrentStep');
+    return savedStep ? Number(savedStep) : 1;
+  });
+  const [activeBookingId, setActiveBookingId] = useState<string | null>(() => localStorage.getItem('voyexActiveBookingId'));
   
   const [user, setUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem('voyexUser');
-    return savedUser ? JSON.parse(savedUser) : null;
+    if (savedUser) return JSON.parse(savedUser);
+
+    const legacyUser = localStorage.getItem('user');
+    return legacyUser ? JSON.parse(legacyUser) : null;
   });
 
   // --- Effects ---
@@ -89,6 +100,22 @@ export const TripProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user]);
 
+  useEffect(() => {
+    localStorage.setItem('voyexTripData', JSON.stringify(tripData));
+  }, [tripData]);
+
+  useEffect(() => {
+    localStorage.setItem('voyexCurrentStep', String(currentStep));
+  }, [currentStep]);
+
+  useEffect(() => {
+    if (activeBookingId) {
+      localStorage.setItem('voyexActiveBookingId', activeBookingId);
+    } else {
+      localStorage.removeItem('voyexActiveBookingId');
+    }
+  }, [activeBookingId]);
+
   // --- Auth Actions ---
   const loginUser = (userData: User) => {
     setUser(userData);
@@ -96,6 +123,8 @@ export const TripProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
   };
 
   // --- Trip Actions ---
@@ -107,6 +136,8 @@ export const TripProvider = ({ children }: { children: ReactNode }) => {
     setTripData(initialTripData);
     setCurrentStep(1);
     setActiveBookingId(null);
+    localStorage.removeItem('voyexTripData');
+    localStorage.removeItem('voyexCurrentStep');
   };
 
   const calculateTotalCost = () => {

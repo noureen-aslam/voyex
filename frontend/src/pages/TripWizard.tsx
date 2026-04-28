@@ -1,10 +1,62 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTripContext } from '../context/TripContext';
-import { MapPin, Calendar, Users, DollarSign, Heart, Car, Hotel, UtensilsCrossed, Map as MapIcon, Check, Loader, ArrowLeft, ArrowRight, Minus, Plus } from 'lucide-react';
+import { MapPin, Calendar, Users, DollarSign, Car, Hotel, UtensilsCrossed, Map as MapIcon, Check, Loader, ArrowLeft, ArrowRight, Minus, Plus } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
 import { destinations, vehicles, hotels, restaurants, sightseeing, travelVibes } from '../data/mockData';
+
+type ItineraryActivity = {
+  time: string;
+  activity: string;
+  location: string;
+};
+
+type ItineraryDay = {
+  day: number;
+  title: string;
+  activities: ItineraryActivity[];
+};
+
+const cityCoordinates: Record<string, { lat: number; lng: number }> = {
+  Delhi: { lat: 28.6139, lng: 77.2090 },
+  Mumbai: { lat: 19.0760, lng: 72.8777 },
+  Bangalore: { lat: 12.9716, lng: 77.5946 },
+  Chennai: { lat: 13.0827, lng: 80.2707 },
+  Hyderabad: { lat: 17.3850, lng: 78.4867 },
+  Kolkata: { lat: 22.5726, lng: 88.3639 },
+  Pune: { lat: 18.5204, lng: 73.8567 },
+  Ahmedabad: { lat: 23.0225, lng: 72.5714 },
+  Goa: { lat: 15.2993, lng: 74.1240 },
+  Manali: { lat: 32.2396, lng: 77.1887 },
+  Kerala: { lat: 9.4981, lng: 76.3388 },
+  Udaipur: { lat: 24.5854, lng: 73.7125 },
+  Jaipur: { lat: 26.9124, lng: 75.7873 },
+  Shimla: { lat: 31.1048, lng: 77.1734 },
+  Rishikesh: { lat: 30.0869, lng: 78.2676 },
+  'Leh Ladakh': { lat: 34.1526, lng: 77.5770 },
+};
+
+const originCities = ['Delhi', 'Mumbai', 'Bangalore', 'Chennai', 'Hyderabad', 'Kolkata', 'Pune', 'Ahmedabad'];
+
+const calculateDistanceKm = (originCity: string, destinationName: string, fallbackDistance = 0) => {
+  const origin = cityCoordinates[originCity];
+  const destination = cityCoordinates[destinationName];
+
+  if (!origin || !destination) return fallbackDistance;
+
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const latDiff = toRadians(destination.lat - origin.lat);
+  const lngDiff = toRadians(destination.lng - origin.lng);
+  const a =
+    Math.sin(latDiff / 2) * Math.sin(latDiff / 2) +
+    Math.cos(toRadians(origin.lat)) * Math.cos(toRadians(destination.lat)) *
+      Math.sin(lngDiff / 2) * Math.sin(lngDiff / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return Math.round(earthRadiusKm * c * 1.25);
+};
 
 const TripWizard = () => {
   const { tripData, updateTripData, currentStep, setCurrentStep, calculateTotalCost } = useTripContext();
@@ -12,6 +64,140 @@ const TripWizard = () => {
   const [isGeneratingItinerary, setIsGeneratingItinerary] = useState(false);
 
   const budgetOptions = ['Budget', 'Standard', 'Luxury', 'Ultra Premium'];
+  const selectedDestination = destinations.find((dest) => dest.name === tripData.destination);
+  const computedDistance = selectedDestination
+    ? calculateDistanceKm(tripData.originCity, selectedDestination.name, selectedDestination.distance)
+    : 0;
+
+  const getTripDays = (startDate = tripData.startDate, endDate = tripData.endDate) => {
+    if (!startDate || !endDate) return 1;
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const dayCount = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+
+    return Math.max(1, dayCount);
+  };
+
+  const getHotelNights = (startDate = tripData.startDate, endDate = tripData.endDate) =>
+    Math.max(1, getTripDays(startDate, endDate));
+
+  const buildMealStops = (destinationRestaurants: typeof restaurants, hotelName: string) => {
+    const mealStops: ItineraryActivity[] = [];
+
+    if (tripData.meals.breakfast) {
+      mealStops.push({
+        time: '8:00 AM',
+        activity: 'Breakfast',
+        location: hotelName,
+      });
+    }
+
+    if (tripData.meals.lunch) {
+      mealStops.push({
+        time: '1:00 PM',
+        activity: 'Lunch',
+        location: destinationRestaurants[0]?.name || `${tripData.destination} Local Restaurant`,
+      });
+    }
+
+    if (tripData.meals.dinner) {
+      mealStops.push({
+        time: '8:00 PM',
+        activity: 'Dinner',
+        location: destinationRestaurants[1]?.name || destinationRestaurants[0]?.name || `${tripData.destination} Dinner Spot`,
+      });
+    }
+
+    return mealStops;
+  };
+
+  const buildDynamicItinerary = (): ItineraryDay[] => {
+    const tripDays = getTripDays();
+    const hotelName = tripData.hotels[0]?.name || `Your stay in ${tripData.destination}`;
+    const destinationRestaurants = restaurants.filter((restaurant) => restaurant.location === tripData.destination);
+    const selectedSightseeing = tripData.sightseeing.length
+      ? tripData.sightseeing
+      : sightseeing.filter((place) => place.location === tripData.destination).slice(0, Math.max(1, tripDays));
+    const selectedVibes = tripData.vibes.length ? tripData.vibes : ['Relaxation'];
+    const mealStops = buildMealStops(destinationRestaurants, hotelName);
+
+    return Array.from({ length: tripDays }, (_, index) => {
+      const day = index + 1;
+      const place = selectedSightseeing[index % Math.max(selectedSightseeing.length, 1)];
+      const vibe = selectedVibes[index % selectedVibes.length];
+      const activities: ItineraryActivity[] = [];
+
+      if (day === 1) {
+        activities.push({
+          time: '10:00 AM',
+          activity: `Travel from ${tripData.originCity || 'your city'} to ${tripData.destination}`,
+          location: `${tripData.originCity || 'Origin'} to ${tripData.destination} (${computedDistance} km)`,
+        });
+        activities.push({
+          time: '11:30 AM',
+          activity: 'Hotel Check-in',
+          location: hotelName,
+        });
+      } else {
+        activities.push({
+          time: '9:00 AM',
+          activity: `${vibe} morning`,
+          location: hotelName,
+        });
+      }
+
+      activities.push(...mealStops);
+
+      if (place) {
+        activities.push({
+          time: day === 1 ? '3:00 PM' : '11:00 AM',
+          activity: `Explore ${place.name}`,
+          location: place.name,
+        });
+      }
+
+      if (vibe === 'Adventure') {
+        activities.push({
+          time: '4:30 PM',
+          activity: 'Adventure session',
+          location: place?.name || tripData.destination,
+        });
+      } else if (vibe === 'Culture' || vibe === 'Spiritual') {
+        activities.push({
+          time: '4:30 PM',
+          activity: `${vibe} exploration`,
+          location: place?.name || tripData.destination,
+        });
+      } else if (vibe === 'Photography' || vibe === 'Nature') {
+        activities.push({
+          time: '5:30 PM',
+          activity: 'Golden hour visit',
+          location: place?.name || tripData.destination,
+        });
+      } else if (vibe === 'Nightlife') {
+        activities.push({
+          time: '9:30 PM',
+          activity: 'Night outing',
+          location: destinationRestaurants[0]?.name || `${tripData.destination} city center`,
+        });
+      }
+
+      if (day === tripDays) {
+        activities.push({
+          time: '6:00 PM',
+          activity: 'Return journey',
+          location: `${tripData.destination} to ${tripData.originCity || 'your city'}`,
+        });
+      }
+
+      return {
+        day,
+        title: `${vibe} day in ${tripData.destination}`,
+        activities,
+      };
+    });
+  };
 
   const handleNext = () => {
     if (currentStep < 6) {
@@ -30,39 +216,7 @@ const TripWizard = () => {
   const handleGenerateAI = () => {
     setIsGeneratingItinerary(true);
     setTimeout(() => {
-      const mockItinerary = [
-        {
-          day: 1,
-          title: 'Arrival & Beach Exploration',
-          activities: [
-            { time: '10:00 AM', activity: 'Hotel Check-in', location: tripData.hotels[0]?.name || 'Your Hotel' },
-            { time: '12:00 PM', activity: 'Lunch at Local Restaurant', location: 'Coastal Kitchen' },
-            { time: '3:00 PM', activity: 'Beach Visit', location: 'Baga Beach' },
-            { time: '7:00 PM', activity: 'Sunset View & Dinner', location: 'Beach Shack' },
-          ],
-        },
-        {
-          day: 2,
-          title: 'Adventure & Sightseeing',
-          activities: [
-            { time: '8:00 AM', activity: 'Breakfast', location: 'Hotel' },
-            { time: '10:00 AM', activity: 'Fort Visit', location: 'Fort Aguada' },
-            { time: '1:00 PM', activity: 'Lunch', location: 'Spice Garden' },
-            { time: '3:00 PM', activity: 'Water Sports', location: 'Baga Beach' },
-            { time: '8:00 PM', activity: 'Dinner', location: 'Seafood Restaurant' },
-          ],
-        },
-        {
-          day: 3,
-          title: 'Nature & Departure',
-          activities: [
-            { time: '7:00 AM', activity: 'Breakfast', location: 'Hotel' },
-            { time: '9:00 AM', activity: 'Waterfall Trek', location: 'Dudhsagar Falls' },
-            { time: '3:00 PM', activity: 'Return Journey', location: 'Departure' },
-          ],
-        },
-      ];
-      updateTripData({ aiItinerary: mockItinerary });
+      updateTripData({ aiItinerary: buildDynamicItinerary() });
       setIsGeneratingItinerary(false);
     }, 1500);
   };
@@ -121,7 +275,20 @@ const TripWizard = () => {
                     {destinations.map((dest) => (
                       <div
                         key={dest.id}
-                        onClick={() => updateTripData({ destination: dest.name, vehicle: { ...tripData.vehicle!, distance: dest.distance } })}
+                        onClick={() =>
+                          updateTripData({
+                            destination: dest.name,
+                            hotels: [],
+                            sightseeing: [],
+                            aiItinerary: [],
+                            vehicle: tripData.vehicle
+                              ? {
+                                  ...tripData.vehicle,
+                                  distance: calculateDistanceKm(tripData.originCity, dest.name, dest.distance),
+                                }
+                              : null,
+                          })
+                        }
                         className={`cursor-pointer rounded-xl overflow-hidden border-2 transition-all ${
                           tripData.destination === dest.name
                             ? 'border-brand-cyan shadow-lg shadow-brand-cyan/30'
@@ -139,13 +306,52 @@ const TripWizard = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
+                      <label className="text-gray-400 text-sm mb-2 block">Pickup City</label>
+                      <div className="flex items-center space-x-2 bg-dark-lighter/50 rounded-lg px-4 py-3 border border-white/10">
+                        <MapPin className="w-5 h-5 text-brand-cyan" />
+                        <select
+                          value={tripData.originCity}
+                          onChange={(e) => {
+                            const nextOrigin = e.target.value;
+                            updateTripData({
+                              originCity: nextOrigin,
+                              aiItinerary: [],
+                              vehicle: selectedDestination && tripData.vehicle
+                                ? {
+                                    ...tripData.vehicle,
+                                    distance: calculateDistanceKm(nextOrigin, selectedDestination.name, selectedDestination.distance),
+                                  }
+                                : tripData.vehicle,
+                            });
+                          }}
+                          className="bg-transparent border-none outline-none text-white w-full"
+                        >
+                          <option value="" className="bg-slate-900">Select your city</option>
+                          {originCities.map((city) => (
+                            <option key={city} value={city} className="bg-slate-900">
+                              {city}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
                       <label className="text-gray-400 text-sm mb-2 block">Check In Date</label>
                       <div className="flex items-center space-x-2 bg-dark-lighter/50 rounded-lg px-4 py-3 border border-white/10">
                         <Calendar className="w-5 h-5 text-brand-cyan" />
                         <input
                           type="date"
                           value={tripData.startDate}
-                          onChange={(e) => updateTripData({ startDate: e.target.value })}
+                          onChange={(e) =>
+                            updateTripData({
+                              startDate: e.target.value,
+                              aiItinerary: [],
+                              hotels: tripData.hotels.map((hotel) => ({
+                                ...hotel,
+                                nights: getHotelNights(e.target.value, tripData.endDate),
+                              })),
+                            })
+                          }
                           className="bg-transparent border-none outline-none text-white w-full"
                         />
                       </div>
@@ -157,7 +363,16 @@ const TripWizard = () => {
                         <input
                           type="date"
                           value={tripData.endDate}
-                          onChange={(e) => updateTripData({ endDate: e.target.value })}
+                          onChange={(e) =>
+                            updateTripData({
+                              endDate: e.target.value,
+                              aiItinerary: [],
+                              hotels: tripData.hotels.map((hotel) => ({
+                                ...hotel,
+                                nights: getHotelNights(tripData.startDate, e.target.value),
+                              })),
+                            })
+                          }
                           className="bg-transparent border-none outline-none text-white w-full"
                         />
                       </div>
@@ -168,6 +383,18 @@ const TripWizard = () => {
                     <div className="text-center">
                       <MapIcon className="w-12 h-12 text-brand-cyan mx-auto mb-2" />
                       <p className="text-gray-400">Map Preview</p>
+                      {selectedDestination && (
+                        <div className="text-sm mt-2 space-y-1">
+                          <p className="text-brand-cyan">
+                            Estimated route: {computedDistance} km
+                          </p>
+                          {tripData.originCity && (
+                            <p className="text-gray-400">
+                              Route: {tripData.originCity} to {selectedDestination.name}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </GlassCard>
@@ -270,7 +497,7 @@ const TripWizard = () => {
                     {vehicles.map((vehicle) => {
                       const isRecommended = vehicle.id === recommendVehicle().id;
                       const isSelected = tripData.vehicle?.type === vehicle.type;
-                      const estimatedCost = vehicle.pricePerKm * (tripData.vehicle?.distance || 0);
+                      const estimatedCost = vehicle.pricePerKm * (tripData.vehicle?.distance || computedDistance || 0);
 
                       return (
                         <div
@@ -280,7 +507,7 @@ const TripWizard = () => {
                               vehicle: {
                                 type: vehicle.type,
                                 pricePerKm: vehicle.pricePerKm,
-                                distance: tripData.vehicle?.distance || 0,
+                                distance: tripData.vehicle?.distance || computedDistance || 0,
                               },
                             })
                           }
@@ -354,7 +581,7 @@ const TripWizard = () => {
                                 onClick={() => {
                                   const newHotels = isSelected
                                     ? tripData.hotels.filter((h) => h.id !== hotel.id)
-                                    : [...tripData.hotels, { ...hotel, nights: 3 }];
+                                    : [...tripData.hotels, { ...hotel, nights: getHotelNights() }];
                                   updateTripData({ hotels: newHotels });
                                 }}
                                 className={`flex gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
@@ -521,6 +748,10 @@ const TripWizard = () => {
                       </button>
                     </div>
 
+                    <p className="text-sm text-gray-400 mb-4">
+                      The itinerary uses your pickup city, destination, dates, vibes, meals, hotels, and sightseeing choices.
+                    </p>
+
                     {tripData.aiItinerary.length > 0 && (
                       <div className="space-y-4">
                         {tripData.aiItinerary.map((day) => (
@@ -529,7 +760,7 @@ const TripWizard = () => {
                               Day {day.day}: {day.title}
                             </h5>
                             <div className="space-y-2">
-                              {day.activities.map((activity, i) => (
+                              {day.activities.map((activity: { time: string | number | boolean | ReactElement<any, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | null | undefined; activity: string | number | boolean | ReactElement<any, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | null | undefined; location: string | number | boolean | ReactElement<any, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | null | undefined; }, i: Key | null | undefined) => (
                                 <div key={i} className="flex gap-3 text-sm">
                                   <span className="text-brand-cyan font-semibold w-20">{activity.time}</span>
                                   <div className="flex-1">
@@ -564,6 +795,10 @@ const TripWizard = () => {
                           <div className="bg-dark-lighter/30 rounded-xl p-4 border border-white/10">
                             <div className="grid grid-cols-2 gap-4">
                               <div>
+                                <span className="text-gray-400 text-sm">Pickup City</span>
+                                <div className="text-white font-semibold">{tripData.originCity || 'Not selected'}</div>
+                              </div>
+                              <div>
                                 <span className="text-gray-400 text-sm">Destination</span>
                                 <div className="text-white font-semibold">{tripData.destination}</div>
                               </div>
@@ -590,6 +825,11 @@ const TripWizard = () => {
                             <div className="text-gray-400 text-sm">
                               ₹{tripData.vehicle?.pricePerKm}/km × {tripData.vehicle?.distance}km
                             </div>
+                            {tripData.originCity && tripData.destination && (
+                              <div className="text-gray-500 text-sm mt-1">
+                                {tripData.originCity} to {tripData.destination}
+                              </div>
+                            )}
                           </div>
                         </div>
 
