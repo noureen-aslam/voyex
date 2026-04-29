@@ -202,4 +202,3 @@ From `backend/`:
 
 ---
 
-If you want, I can also generate a shorter `README` version for GitHub visitors and keep this as a full `docs/DEVELOPMENT.md`.
