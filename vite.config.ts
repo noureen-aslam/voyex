@@ -8,6 +8,7 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   base: '/',
+  publicDir: '../public',  // 👈 add this
   server: {
     proxy: {
       '/api': {
